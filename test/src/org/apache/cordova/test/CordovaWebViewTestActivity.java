@@ -19,90 +19,56 @@
 
 package org.apache.cordova.test;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ArrayBlockingQueue;
 
 import org.apache.cordova.Config;
-import org.apache.cordova.CordovaChromeClient;
+import org.apache.cordova.ConfigXmlParser;
+import org.apache.cordova.CordovaInterfaceImpl;
 import org.apache.cordova.CordovaWebView;
-import org.apache.cordova.CordovaInterface;
-import org.apache.cordova.CordovaPlugin;
-import org.apache.cordova.CordovaWebViewClient;
-import org.apache.cordova.test.R;
+import org.apache.cordova.CordovaWebViewImpl;
+import org.apache.cordova.engine.SystemWebView;
+import org.apache.cordova.engine.SystemWebViewEngine;
 
 import android.app.Activity;
-import android.content.Context;
-import android.content.Intent;
 import android.os.Bundle;
 
-public class CordovaWebViewTestActivity extends Activity implements CordovaInterface {
-    public CordovaWebView cordovaWebView;
+/**
+ * Tests creating the views via inflating a layout, and also tests *not* using CordovaActivity.
+ */
+public class CordovaWebViewTestActivity extends Activity {
+    private CordovaWebView cordovaWebView;
+    public final ArrayBlockingQueue<String> onPageFinishedUrl = new ArrayBlockingQueue<String>(5);
+    public static final String START_URL = "file:///android_asset/www/index.html";
 
-    private final ExecutorService threadPool = Executors.newCachedThreadPool();
-    
+    protected CordovaInterfaceImpl cordovaInterface = new CordovaInterfaceImpl(this) {
+        @Override
+        public Object onMessage(String id, Object data) {
+            if ("onPageFinished".equals(id)) {
+                onPageFinishedUrl.add((String) data);
+            }
+            return super.onMessage(id, data);
+        }
+    };
+
     /** Called when the activity is first created. */
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         setContentView(R.layout.main);
 
-        //CB-7238: This has to be added now, because it got removed from somewhere else
-        Config.init(this);
-        
-        cordovaWebView = (CordovaWebView) findViewById(R.id.cordovaWebView);
-        cordovaWebView.init(this, new CordovaWebViewClient(this, cordovaWebView), new CordovaChromeClient(this, cordovaWebView),
-                Config.getPluginEntries(), Config.getWhitelist(), Config.getExternalWhitelist(), Config.getPreferences());
 
-        cordovaWebView.loadUrl("file:///android_asset/www/index.html");
+        //Set up the webview
+        ConfigXmlParser parser = new ConfigXmlParser();
+        parser.parse(this);
 
+        SystemWebView webView = (SystemWebView) findViewById(R.id.cordovaWebView);
+        cordovaWebView = new CordovaWebViewImpl(new SystemWebViewEngine(webView));
+        cordovaWebView.init(cordovaInterface, parser.getPluginEntries(), parser.getPreferences());
+
+        cordovaWebView.loadUrl(START_URL);
     }
 
-    public Context getContext() {
-        return this;
-    }
-
-    public void startActivityForResult(CordovaPlugin command, Intent intent,
-            int requestCode) {
-        // TODO Auto-generated method stub
-        
-    }
-
-    public void setActivityResultCallback(CordovaPlugin plugin) {
-        // TODO Auto-generated method stub
-        
-    }
-
-    //Note: This must always return an activity!
-    public Activity getActivity() {
-        return this;
-    }
-
-    @Deprecated
-    public void cancelLoadUrl() {
-        // TODO Auto-generated method stub
-        
-    }
-
-    public Object onMessage(String id, Object data) {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public ExecutorService getThreadPool() {
-        // TODO Auto-generated method stub
-        return threadPool;
-    }
-    
-    @Override
-    /**
-     * The final call you receive before your activity is destroyed.
-     */
-    public void onDestroy() {
-        super.onDestroy();
-        if (cordovaWebView != null) {
-            // Send destroy event to JavaScript
-            cordovaWebView.handleDestroy();
-        }
+    public CordovaWebView getCordovaWebView() {
+        return cordovaWebView;
     }
 }

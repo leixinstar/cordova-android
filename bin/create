@@ -19,18 +19,38 @@
        under the License.
 */
 var path = require('path');
-var create = require('./lib/create');
-var args  = require('./lib/simpleargs').getArgs(process.argv);
+var ConfigParser = require('cordova-common').ConfigParser;
+var Api = require('./templates/cordova/Api');
 
-if (args['--help'] || args._.length === 0) {
-    console.log('Usage: ' + path.relative(process.cwd(), path.join(__dirname, 'create')) + ' <path_to_new_project> <package_name> <project_name> [<template_path>] [--shared]');
+var argv = require('nopt')({
+    'help' : Boolean,
+    'cli' : Boolean,
+    'shared' : Boolean,
+    'link' : Boolean,
+    'activity-name' : [String, undefined]
+});
+
+if (argv.help || argv.argv.remain.length === 0) {
+    console.log('Usage: ' + path.relative(process.cwd(), path.join(__dirname, 'create')) + ' <path_to_new_project> <package_name> <project_name> [<template_path>] [--activity-name <activity_name>] [--link]');
     console.log('    <path_to_new_project>: Path to your new Cordova Android project');
     console.log('    <package_name>: Package name, following reverse-domain style convention');
     console.log('    <project_name>: Project name');
     console.log('    <template_path>: Path to a custom application template to use');
-    console.log('    --shared will use the CordovaLib project directly instead of making a copy.');
+    console.log('    --activity-name <activity_name>: Activity name');
+    console.log('    --link will use the CordovaLib project directly instead of making a copy.');
     process.exit(1);
 }
 
-create.createProject(args._[0], args._[1], args._[2], args._[3], args['--shared'], args['--cli']).done();
+var config = new ConfigParser(path.resolve(__dirname, 'templates/project/res/xml/config.xml'));
 
+if (argv.argv.remain[1]) config.setPackageName(argv.argv.remain[1]);
+if (argv.argv.remain[2]) config.setName(argv.argv.remain[2]);
+if (argv['activity-name']) config.setName(argv['activity-name']);
+
+var options = {
+    link: argv.link || argv.shared,
+    customTemplate: argv.argv.remain[3],
+    activityName: argv['activity-name']
+};
+
+Api.createPlatform(argv.argv.remain[0], config, options).done();
